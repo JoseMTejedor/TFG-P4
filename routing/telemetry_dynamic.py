@@ -2,58 +2,55 @@ import time
 import sqlite3
 import ipaddress
 from dataclasses import dataclass
-
 import networkx as nx
 from p4utils.utils.sswitch_p4runtime_API import SimpleSwitchP4RuntimeAPI
-
 
 # -----------------------------------------------------------------------------
 # Parámetros generales del controlador
 # -----------------------------------------------------------------------------
 
-P4RT_PATH = 'telemetry_p4rt.txt'
-JSON_PATH = 'telemetry.json'
+P4RT_PATH = 'telemetry_dynamic_p4rt.txt'
+JSON_PATH = 'telemetry_dynamic.json'
 DB_FILE = 'telemetry.db'
 
-# Coste base asumido por enlace entre switches.
-# De momento usamos 1 ms = 1000 us. Más adelante se puede sustituir por el
-# valor estimado a partir de las medidas RTT.
-BASE_LINK_DELAY_US = 1000
+# Coste base por enlace entre switches, 
+# La unidad son us.
+# Valor estimado a partir de medidas RTT.
+BASE_LINK_DELAY = 1000
 
-# Número de muestras usadas por puerto para calcular la media amortiguada.
+# Número de muestras usadas para calcular la media del retardo.
 # Si para un puerto solo hay 5 muestras y N=30, se divide entre 30 igualmente.
-# Esto equivale a rellenar con ceros las muestras que faltan y evita
-# sobrerreaccionar cuando hay pocos datos.
+# Evita sobrerreaccionar cuando hay pocos datos.
 SAMPLES_PER_PORT = 30
 
-# Número máximo de filas recientes que se leen de la base de datos para calcular
-# las medias por puerto. No afecta al cálculo final salvo que haya muchísimas
-# muestras recientes.
-DB_READ_LIMIT = 3000
+# Ventana temporal usada para calcular las métricas recientes.
+METRICS_WINDOW_SECONDS = 30
 
-# Umbrales para seleccionar una ruta alternativa.
-# La ruta alternativa solo se elige si mejora a la ruta por defecto de forma
-# clara en términos absolutos y relativos.
-REL_THRESHOLD = 0.20
-ABS_THRESHOLD_US = BASE_LINK_DELAY_US
+# Umbral relativo para seleccionar una ruta alternativa.
+THRESHOLD = 0.20
 
-# Umbral auxiliar de congestión. Solo se plantea desviar tráfico si la ruta por
-# defecto tiene al menos este valor de cola media en alguno de sus puertos.
-QUEUE_CONGESTION_US = 1000
+# Margen mínimo opcional para evitar cambios por diferencias muy pequeñas.
+MIN_IMPROVEMENT = 200
 
-# Gestión de vida de las rutas dinámicas.
+# Tiempo que una ruta dinamica permanece activa antes de comprobar si sigue viva.
 ROUTE_TTL = 60
+#Tiempo que una ruta espera un nuevo mensaje de flujo vivo antes de considerarla inactiva.
 PROBATION_WINDOW = 15
 
 # Tipos de digest definidos en P4.
 DIGEST_NEW_FLOW = 1
 DIGEST_FLOW_ALIVE = 2
 
-
 # -----------------------------------------------------------------------------
-# Información fija de switches, hosts y enlaces
+# Información de switches, hosts y enlaces
 # -----------------------------------------------------------------------------
 
+# Es necesario guardar la informaicon de la topología, para poder hacer el 
+# calculo de las rutas dinámicas.
+
+# Switches de la topología. La clave del diccionario es el identificador numérico del switch, 
+# que coincide con el device_id de P4Runtime, con el switch_id usado en P4 y por ende,
+# con el valor almacenado en la base de datos.
 SWITCHES = {
     1: {'name': 'sA', 'grpc_port': 9559, 'collector_src_ip': '10.99.0.1'},
     2: {'name': 'sB', 'grpc_port': 9560, 'collector_src_ip': '10.99.0.2'},
@@ -64,8 +61,7 @@ SWITCHES = {
     7: {'name': 'sG', 'grpc_port': 9565, 'collector_src_ip': '10.99.0.7'},
 }
 
-# Hosts finales. La IP se guarda como texto para instalar reglas de tabla, y el
-# controlador la convierte a entero cuando necesita compararla con la base de datos.
+# Hosts de la topología. La clave del diccionario es la IP del host.
 HOSTS = {
     '10.0.1.1': {'name': 'h1', 'switch': 1, 'port': 1, 'mac': '00:00:00:00:00:01'},
     '10.0.1.2': {'name': 'h4', 'switch': 1, 'port': 6, 'mac': '00:00:00:00:00:04'},
@@ -75,8 +71,10 @@ HOSTS = {
     '10.0.5.1': {'name': 'h3', 'switch': 5, 'port': 1, 'mac': '00:00:00:00:00:03'},
 }
 
-# Enlaces entre switches. Cada entrada indica cómo salir desde un switch hacia
-# su vecino: puerto de salida y MAC del siguiente salto.
+# Enlaces entre switches.
+# La primera clave identifica el switch origen. Dentro de cada entrada aparecen
+# los switches vecinos alcanzables directamente desde él.
+# Para cada vecino se indica el puerto de salida y la MAC del siguiente salto.
 LINKS = {
     1: {
         2: {'port': 2, 'mac': '00:00:00:00:0A:0B'},
@@ -110,48 +108,50 @@ LINKS = {
     },
 }
 
-
+# Data class para guardar el estado de una ruta dinámica.
 @dataclass
-class FlowState:
+class RouteState:
     src_ip: str
     dst_ip: str
     path: list
     status: str
     expires_at: float
-    probe_until: float = 0.0
-
+    probe_until: float = 0.0 #Se inicializa en 0 porque cuando la ruta está activa, no necesitamos el valor.
 
 # -----------------------------------------------------------------------------
-# Funciones auxiliares
+# Funciones útiles
 # -----------------------------------------------------------------------------
 
-def ip_to_int(ip_str):
-    return int(ipaddress.IPv4Address(ip_str))
-
-
+# Función para convertir una IP en formato entero a formato texto.
+# La base de datos y los digest reciben las IPs como enteros de 32 bits.
+# El controlador trabaja con IPs en formato texto, porque es el que usamos
+# para instalar reglas P4Runtime.
 def int_to_ip(ip_int):
     return str(ipaddress.IPv4Address(ip_int))
 
-
+# Genera una clave bidireccional para identificar una pareja de hosts.
+# sorted(...) ordena las dos IPs para que A->B y B->A produzcan la misma clave.
+# tuple(...) convierte la lista ordenada en una tupla, que puede usarse como
+# clave en el diccionario de rutas dinámicas.
 def pair_key(src_ip, dst_ip):
-    """Devuelve una clave no direccional para tratar h1-h6 y h6-h1 igual."""
-    return tuple(sorted([ip_to_int(src_ip), ip_to_int(dst_ip)]))
+    return tuple(sorted([src_ip, dst_ip]))
 
-
+# Los campos enviados por P4Runtime dentro del digest llegan como bytes.
+# Esta función interpreta esos bytes en orden de red,
+# y los convierte a un entero normal de Python.
 def p4data_bitstring_to_int(p4data):
-    """Convierte un campo bit<W> recibido en un digest a entero Python."""
     return int.from_bytes(p4data.bitstring, byteorder='big')
 
-
+# Extrae los campos de un digest flow_digest_t recibido desde P4Runtime.
+# En P4 el digest se define como un struct:
+#        digest_type, switch_id, src_ip, dst_ip
+# Al llegar p4utils lo entregacomo una entrada de digest. Dentro de esa 
+# entrada hay una estructura interna y sus campos aparecen en la lista 
+# members, manteniendo el mismo orden definido en P4.
 def parse_flow_digest_entry(entry):
-    """
-    Extrae los campos del digest flow_digest_t.
-
-    Orden esperado en P4:
-        digest_type, switch_id, src_ip, dst_ip
-    """
-    # En P4Runtime, el digest de un struct llega como P4Data.struct.members.
+    # Obtenemos la estructura interna del digest recibido.
     struct_data = getattr(entry, 'struct')
+    # Extraemos los campos de esa estructura.
     members = struct_data.members
 
     if len(members) != 4:
@@ -171,14 +171,28 @@ def parse_flow_digest_entry(entry):
 
 class DynamicTelemetryController:
     def __init__(self):
+        
+        # Diccionario donde se guardan las conexiones P4Runtime con cada switch.
+        # La clave es el ID numérico del switch y el valor es su controlador.
         self.controllers = {}
+
+        # Grafo de NetworkX que representa la topología de la red.
+        # Los nodos son los switches y las aristas son los enlaces.
+        # Se usa para calcular caminos entre el switch origen y el switch destino.
         self.graph = nx.Graph()
-        self.flows = {}
+        
+        # Rutas dinámicas instaladas actualmente.
+        # La clave es una pareja de IPs ordenada.
+        # El valor es un RouteState con el camino elegido y sus temporizadores.
+        self.dynamic_routes = {}
 
     # -------------------------------------------------------------------------
     # Inicialización
     # -------------------------------------------------------------------------
-
+    
+    # Recorre todos los switches de la topología, crea una conexión
+    # P4Runtime con cada uno y la guarda en self.controllers 
+    # usando el ID del switch como clave.
     def connect_switches(self):
         for sw_id, info in SWITCHES.items():
             self.controllers[sw_id] = SimpleSwitchP4RuntimeAPI(
@@ -187,42 +201,61 @@ class DynamicTelemetryController:
                 p4rt_path=P4RT_PATH,
                 json_path=JSON_PATH,
             )
-
+    
+    # Configura el estado inicial de todos los switches P4.
+    # Se borra cualquier configuración previa con reset_state().
+    # Se instalan las reglas comunes necesarias para la telemetría:
+    #   - switch_info: asigna el identificador del switch.
+    #   - telemetry_routing: cómo enviar los paquetes clonados al colector.
+    #   - cs_create: crea la sesión de clonación.
+    #   - ipv4_lpm: tabla de encaminamiento estático de respaldo.
+    #
+    # Se instalan las rutas estáticas iniciales y las reglas que
+    # eliminan la cabecera measurement_t antes de entregar paquetes a hosts.
     def reset_and_configure_static_state(self):
         for sw_id, controller in self.controllers.items():
             controller.reset_state()
+            #Cambiamos la accion por defecto de la tabla switch_info para añadir el ID del switch.
             controller.table_set_default('switch_info', 'set_switch_id', [str(sw_id)])
+            #Cambiamos la accion por defecto de la tabla telemetry_routing para añadir la MAC y la IP de la base de datos.
             controller.table_set_default(
                 'telemetry_routing',
                 'route_telemetry',
                 ['00:00:00:99:99:99', '10.99.0.100', SWITCHES[sw_id]['collector_src_ip']],
             )
+            #Indicamos que los mensajes clonados, con ID 500, se manden por el puerto 5.
             controller.cs_create(500, [5])
             controller.table_set_default('ipv4_lpm', 'drop')
 
         self.install_static_ipv4_routes()
         self.install_remove_header_rules()
 
+    # Habilita en los switches la recepción del digest flow_digest_t.
+    # se usa para avisar al controlador de la detección de un nuevo flujo,
+    # o confirmar que una ruta dinámica sigue teniendo tráfico.
     def enable_digests(self):
         for sw_id, controller in self.controllers.items():
-            # El nombre del digest es el nombre del struct usado en P4:
-            # digest<flow_digest_t>(1, {...})
             controller.digest_enable(
                 'flow_digest_t',
                 max_timeout_ns=0,
                 max_list_size=1,
                 ack_timeout_ns=0,
             )
-            print(f'Digest flow_digest_t habilitado en s{sw_id}')
-
+            print(f"Digest flow_digest_t habilitado en {SWITCHES[sw_id]['name']}")
+    
+    # Construye el grafo de la topología usando NetworkX.
     def build_graph(self):
+        # Cada switch se añade como un nodo del grafo.
         for sw_id in SWITCHES:
             self.graph.add_node(sw_id)
 
+        # Se añaden los enlaces entre switches.
+        # src_sw es el switch origen y dst_sw cada uno de sus vecinos.
         for src_sw, neighbors in LINKS.items():
             for dst_sw in neighbors:
+                # Como el grafo es no dirigido, solo se añade enlace si no existe.
                 if not self.graph.has_edge(src_sw, dst_sw):
-                    self.graph.add_edge(src_sw, dst_sw, base_cost=BASE_LINK_DELAY_US)
+                    self.graph.add_edge(src_sw, dst_sw, base_cost=BASE_LINK_DELAY)
 
     # -------------------------------------------------------------------------
     # Configuración estática original
@@ -275,9 +308,9 @@ class DynamicTelemetryController:
         c[7].table_add('ipv4_lpm', 'ipv4_forward', ['10.0.4.0/24'], ['00:00:00:00:07:0D', '3'])
         c[7].table_add('ipv4_lpm', 'ipv4_forward', ['10.0.5.0/24'], ['00:00:00:00:07:0D', '3'])
 
+    # Elimina la cabecera personalizada measurement_t antes de entregar paquetes a hosts finales.
+    # Para ello se añaden reglas a la tabla remove_header_tbl, indicando el puerto de salida hacia hosts.
     def install_remove_header_rules(self):
-        # Puertos conectados a hosts finales. En esos puertos se elimina la
-        # cabecera measurement_t antes de entregar el paquete al host.
         self.controllers[1].table_add('remove_header_tbl', 'remove_header', ['1'])
         self.controllers[1].table_add('remove_header_tbl', 'remove_header', ['6'])
         self.controllers[3].table_add('remove_header_tbl', 'remove_header', ['1'])
@@ -286,18 +319,17 @@ class DynamicTelemetryController:
         self.controllers[5].table_add('remove_header_tbl', 'remove_header', ['1'])
 
     # -------------------------------------------------------------------------
-    # Métricas desde la base de datos
+    # Métricas y cálculo de rutas
     # -------------------------------------------------------------------------
 
+    # Lee de la base de datos las métricas recientes de telemetría y las agrupa
+    # por puerto de salida.
+    # La clave usada para agrupar es (switch_id, egress_port), porque el coste
+    # de una ruta depende del puerto por el que sale el paquete en cada switch.
+    # Solo se tienen en cuenta muestras dentro de la ventana temporal 
+    # METRICS_WINDOW_SECONDS y como máximo las últimas SAMPLES_PER_PORT muestras.
     def read_port_metrics(self, exclude_pair_key=None):
-        """
-        Devuelve medias amortiguadas por (switch_id, egress_port).
 
-        Para cada puerto se usan como máximo SAMPLES_PER_PORT muestras. Si hay
-        menos, se divide igualmente entre SAMPLES_PER_PORT, equivalente a rellenar
-        con ceros. Si exclude_pair_key se pasa, se ignoran muestras de ese par en
-        ambos sentidos para evitar autointerferencia directa.
-        """
         samples = {}
 
         try:
@@ -306,29 +338,46 @@ class DynamicTelemetryController:
             cursor.execute('''
                 SELECT switch_id, egress_port, ingress_egress_time, queue_time, src_ip, dst_ip
                 FROM link_metrics
+                WHERE timestamp >= datetime('now', ?)
                 ORDER BY id DESC
-                LIMIT ?
-            ''', (DB_READ_LIMIT,))
+            ''', (f'-{METRICS_WINDOW_SECONDS} seconds',))
             rows = cursor.fetchall()
             conn.close()
-        except sqlite3.Error:
+
+        except sqlite3.Error as exc:
+            print(f'No se pudieron leer métricas de la base de datos: {exc}')
             return {}
 
         for sw_id, port, ingress_egress_time, queue_time, src_ip, dst_ip in rows:
-            if exclude_pair_key is not None and tuple(sorted([src_ip, dst_ip])) == exclude_pair_key:
+            # Las IPs llegan desde la base de datos como enteros.
+            # Las convertimos a texto.
+            src_ip_text = int_to_ip(src_ip)
+            dst_ip_text = int_to_ip(dst_ip)
+
+            # Si estamos calculando la ruta para un par concreto, ignoramos
+            # las muestras generadas por ese mismo par en ambos sentidos.
+            # Asi se evita a sobrerreaccionar a cambios causados por la propia ruta dinámica que se está evaluando.
+            if exclude_pair_key is not None and pair_key(src_ip_text, dst_ip_text) == exclude_pair_key:
                 continue
 
             key = (sw_id, port)
+
             if key not in samples:
                 samples[key] = []
 
+            # Como los datos vienen ordenados por id DESC, nos quedamos con las
+            # últimas SAMPLES_PER_PORT muestras de cada puerto.
             if len(samples[key]) < SAMPLES_PER_PORT:
                 samples[key].append((ingress_egress_time, queue_time))
 
         metrics = {}
+        
+        # Las medias se dividen siempre entre SAMPLES_PER_PORT, para 
+        # suaviza el resultado cuando hay pocos datos evitando sobrerreaccionar.
         for key, values in samples.items():
             avg_ingress_egress = sum(v[0] for v in values) / SAMPLES_PER_PORT
             avg_queue = sum(v[1] for v in values) / SAMPLES_PER_PORT
+
             metrics[key] = {
                 'avg_ingress_egress_time': avg_ingress_egress,
                 'avg_queue_time': avg_queue,
@@ -337,25 +386,30 @@ class DynamicTelemetryController:
 
         return metrics
 
-    # -------------------------------------------------------------------------
-    # Cálculo de rutas
-    # -------------------------------------------------------------------------
-
+    # Calcula el coste de usar el enlace.
+    # Obtiene el puerto de salida correspondiente y suma
+    # al coste base del enlace el retardo medio medido en ese puerto.
     def edge_cost(self, src_sw, dst_sw, metrics):
         out_port = LINKS[src_sw][dst_sw]['port']
         port_metrics = metrics.get((src_sw, out_port), {})
         avg_ingress_egress = port_metrics.get('avg_ingress_egress_time', 0)
-        return BASE_LINK_DELAY_US + avg_ingress_egress
+        return BASE_LINK_DELAY + avg_ingress_egress
 
+    # Calcula el coste total de una ruta sumando el coste de cada enlace
+    # consecutivo entre los switches de la ruta.
     def path_cost(self, path, metrics):
         if len(path) <= 1:
             return 0
 
         cost = 0
+        # zip(path[:-1], path[1:]) genera pares consecutivos de switches en la ruta.
         for src_sw, dst_sw in zip(path[:-1], path[1:]):
             cost += self.edge_cost(src_sw, dst_sw, metrics)
         return cost
 
+    # Devuelve el tiempo medio de cola mas alto encontrado en los puertos
+    # de salida que forman la ruta. Sirve para identificar el punto de más
+    # congestión del camino.
     def max_queue_on_path(self, path, metrics):
         max_queue = 0
         for src_sw, dst_sw in zip(path[:-1], path[1:]):
@@ -363,7 +417,11 @@ class DynamicTelemetryController:
             port_metrics = metrics.get((src_sw, out_port), {})
             max_queue = max(max_queue, port_metrics.get('avg_queue_time', 0))
         return max_queue
-
+    
+    # Selecciona la ruta que debe usarse entre dos hosts.
+    # Primero calcula la ruta por defecto y su coste actual.
+    # Después calcula la mejor ruta según las métricas recientes y su coste.
+    # Solo se elige la ruta dinámica si mejora suficientemente a la ruta por defect
     def choose_path(self, src_ip, dst_ip):
         src_sw = HOSTS[src_ip]['switch']
         dst_sw = HOSTS[dst_ip]['switch']
@@ -379,12 +437,12 @@ class DynamicTelemetryController:
         default_cost = self.path_cost(default_path, metrics)
         default_max_queue = self.max_queue_on_path(default_path, metrics)
 
-        # Actualizamos pesos dinámicos temporalmente para calcular el mejor camino.
+        # Actualizamos pesos dinámicos para calcular el mejor camino. actual.
         for u, v in self.graph.edges():
             forward_cost = self.edge_cost(u, v, metrics)
             reverse_cost = self.edge_cost(v, u, metrics)
-            # El grafo es no dirigido. Para evitar complicar con DiGraph, usamos
-            # el peor de ambos sentidos como coste conservador del enlace.
+            # El grafo es no dirigido. Por lo que usamos el peor de ambos
+            # sentidos como coste conservador del enlace.
             self.graph[u][v]['dynamic_cost'] = max(forward_cost, reverse_cost)
 
         best_path = nx.shortest_path(self.graph, src_sw, dst_sw, weight='dynamic_cost')
@@ -392,7 +450,6 @@ class DynamicTelemetryController:
 
         improvement_abs = default_cost - best_cost
         improvement_rel = improvement_abs / default_cost if default_cost > 0 else 0
-        default_congested = default_max_queue >= QUEUE_CONGESTION_US
 
         print(
             f'Ruta por defecto {default_path}: coste={default_cost:.1f} us, '
@@ -404,20 +461,21 @@ class DynamicTelemetryController:
         )
 
         if (
-            default_congested
-            and improvement_abs >= ABS_THRESHOLD_US
-            and improvement_rel >= REL_THRESHOLD
+            improvement_rel >= THRESHOLD
+            and improvement_abs >= MIN_IMPROVEMENT
         ):
             print('Se selecciona la ruta dinámica alternativa.')
             return best_path
 
         print('Se mantiene la ruta por defecto/corta.')
         return default_path
-
+    
     # -------------------------------------------------------------------------
     # Instalación, modificación y borrado de rutas dinámicas
     # -------------------------------------------------------------------------
 
+    # Devuelve la MAC y el puerto que debe usar el switch para su siguiente salto,
+    # entregandole el path que debe seguir.
     def action_params_for_step(self, dst_ip, path, index):
         current_sw = path[index]
 
@@ -429,6 +487,9 @@ class DynamicTelemetryController:
         link_info = LINKS[current_sw][next_sw]
         return link_info['mac'], link_info['port']
 
+    # Instala las reglas de flow_routing para un sentido del tráfico.
+    # Para cada switch se calcula la MAC y el puerto de salida
+    # para avanzar al siguiente salto o entregar al host destino.
     def install_direction(self, src_ip, dst_ip, path, action_name='ipv4_forward'):
         for index, sw_id in enumerate(path):
             dst_mac, out_port = self.action_params_for_step(dst_ip, path, index)
@@ -439,6 +500,8 @@ class DynamicTelemetryController:
                 [dst_mac, str(out_port)],
             )
 
+    # Elimina de flow_routing las reglas instaladas para un sentido concreto
+    # del tráfico en todos los switches que forman la ruta.
     def delete_direction(self, src_ip, dst_ip, path):
         for sw_id in path:
             self.controllers[sw_id].table_delete_match(
@@ -446,6 +509,8 @@ class DynamicTelemetryController:
                 [src_ip, dst_ip],
             )
 
+    # Modifica la acción de flow_routing solo en el switch de entrada del camino.
+    # Se usa para pasar una ruta a modo probation o devolverla a modo normal.
     def modify_ingress_action(self, src_ip, dst_ip, path, action_name):
         ingress_sw = path[0]
         dst_mac, out_port = self.action_params_for_step(dst_ip, path, 0)
@@ -456,6 +521,8 @@ class DynamicTelemetryController:
             [dst_mac, str(out_port)],
         )
 
+    # Instala una ruta dinámica en ambos sentidos entre dos hosts.
+    # También guarda el estado de la ruta para controlar su tiempo de vida.
     def install_bidirectional_route(self, src_ip, dst_ip, path):
         reverse_path = list(reversed(path))
 
@@ -463,7 +530,7 @@ class DynamicTelemetryController:
         self.install_direction(dst_ip, src_ip, reverse_path, 'ipv4_forward')
 
         key = pair_key(src_ip, dst_ip)
-        self.flows[key] = FlowState(
+        self.dynamic_routes[key] = RouteState(
             src_ip=src_ip,
             dst_ip=dst_ip,
             path=path,
@@ -473,11 +540,12 @@ class DynamicTelemetryController:
 
         print(f'Ruta dinámica instalada para {src_ip} <-> {dst_ip}: {path}')
 
-    def enter_probation(self, key, state):
+    # Modificamos los switches de entrada de cada sentido para que
+    # entren estado probation. Para saber si la ruta sigue activa o no. 
+    # Permitiendo que se manden digests.
+    def enter_probation(self, state):
         reverse_path = list(reversed(state.path))
 
-        # Solo modificamos los switches de entrada de cada sentido. El resto de
-        # reglas siguen reenviando normal.
         self.modify_ingress_action(state.src_ip, state.dst_ip, state.path, 'ipv4_forward_probe')
         self.modify_ingress_action(state.dst_ip, state.src_ip, reverse_path, 'ipv4_forward_probe')
 
@@ -486,7 +554,8 @@ class DynamicTelemetryController:
 
         print(f'Ruta {state.src_ip} <-> {state.dst_ip} en probation.')
 
-    def renew_route(self, key, state):
+    # Renueva una ruta que estaba en probation porque se ha recibido tráfico nuevo.
+    def renew_route(self, state):
         reverse_path = list(reversed(state.path))
 
         self.modify_ingress_action(state.src_ip, state.dst_ip, state.path, 'ipv4_forward')
@@ -498,36 +567,46 @@ class DynamicTelemetryController:
 
         print(f'Ruta {state.src_ip} <-> {state.dst_ip} renovada.')
 
+    # Elimina las reglas de flow_routing de ambos sentidos del tráfico en todos los switches,
+    # borrando la ruta dinámica.
     def delete_bidirectional_route(self, key, state):
         reverse_path = list(reversed(state.path))
 
         self.delete_direction(state.src_ip, state.dst_ip, state.path)
         self.delete_direction(state.dst_ip, state.src_ip, reverse_path)
 
-        del self.flows[key]
+        del self.dynamic_routes[key]
         print(f'Ruta {state.src_ip} <-> {state.dst_ip} eliminada por inactividad.')
+
 
     # -------------------------------------------------------------------------
     # Gestión de digest
     # -------------------------------------------------------------------------
-
+    
+    # Procesa un digest NEW_FLOW recibido desde un switch.
+    # Si el par de hosts es conocido y todavía no tiene ruta dinámica,
+    # calcula el mejor camino e instala la ruta.
     def handle_new_flow(self, switch_id, src_ip, dst_ip):
+        # Comprobamos que ambos hosts son conocidos en la topología.
         if src_ip not in HOSTS or dst_ip not in HOSTS:
             print(f'Digest NEW_FLOW ignorado: host desconocido {src_ip} -> {dst_ip}')
             return
 
         key = pair_key(src_ip, dst_ip)
-        if key in self.flows:
+        if key in self.dynamic_routes:
             print(f'Digest NEW_FLOW ignorado: ya existe ruta para {src_ip} <-> {dst_ip}')
             return
 
-        print(f'Nuevo par detectado en s{switch_id}: {src_ip} -> {dst_ip}')
+        print(f"Nuevo par detectado en {SWITCHES[switch_id]['name']}: {src_ip} -> {dst_ip}")
         path = self.choose_path(src_ip, dst_ip)
         self.install_bidirectional_route(src_ip, dst_ip, path)
 
+    # Procesa un digest FLOW_ALIVE recibido desde un switch.
+    # Si la ruta asociada al par de hosts está en probation, 
+    # la ruta se renueva y vuelve al estado ACTIVE.
     def handle_flow_alive(self, switch_id, src_ip, dst_ip):
         key = pair_key(src_ip, dst_ip)
-        state = self.flows.get(key)
+        state = self.dynamic_routes.get(key)
 
         if state is None:
             print(f'Digest FLOW_ALIVE ignorado: no hay estado para {src_ip} <-> {dst_ip}')
@@ -537,9 +616,12 @@ class DynamicTelemetryController:
             print(f'Digest FLOW_ALIVE recibido para ruta ya activa {src_ip} <-> {dst_ip}')
             return
 
-        print(f'FLOW_ALIVE recibido en s{switch_id}: {src_ip} -> {dst_ip}')
-        self.renew_route(key, state)
+        print(f"FLOW_ALIVE recibido en {SWITCHES[switch_id]['name']}: {src_ip} -> {dst_ip}")
+        self.renew_route(state)
 
+    # Consulta todos los switches para leer los digest recibidos.
+    # Según el tipo recibido, se gestiona como nuevo flujo o como confirmación 
+    # de ruta activa durante probation.
     def poll_digests(self):
         for sw_id, controller in self.controllers.items():
             digest_list = controller.get_digest_list(timeout=0)
@@ -550,7 +632,7 @@ class DynamicTelemetryController:
                 try:
                     digest_type, switch_id, src_ip, dst_ip = parse_flow_digest_entry(entry)
                 except Exception as exc:
-                    print(f'No se pudo parsear un digest de s{sw_id}: {exc}')
+                    print(f"No se pudo parsear un digest de {SWITCHES[sw_id]['name']}: {exc}")
                     continue
 
                 if digest_type == DIGEST_NEW_FLOW:
@@ -564,12 +646,16 @@ class DynamicTelemetryController:
     # Temporizadores de rutas
     # -------------------------------------------------------------------------
 
+    # Revisa periódicamente los temporizadores de las rutas dinámicas.
+    # Si una ruta activa supera su tiempo de vida, se pasa a probation.
+    # Si una ruta en probation supera su ventana de prueba sin recibir tráfico,
+    # se eliminan sus reglas dinámicas.
     def check_route_timers(self):
         now = time.monotonic()
 
-        for key, state in list(self.flows.items()):
+        for key, state in list(self.dynamic_routes.items()):
             if state.status == 'ACTIVE' and now >= state.expires_at:
-                self.enter_probation(key, state)
+                self.enter_probation(state)
 
             elif state.status == 'PROBATION' and now >= state.probe_until:
                 self.delete_bidirectional_route(key, state)
@@ -578,14 +664,20 @@ class DynamicTelemetryController:
     # Bucle principal
     # -------------------------------------------------------------------------
 
+    # Inicializa el controlador dinámico y deja el plano de control en ejecución.
     def run(self):
+        # Conectamos el controlador con los switches.
         self.connect_switches()
+        # Construimos el grafo de la topología NetworkX.
         self.build_graph()
+        # Configuramos el estado estático inicial de los switches.
         self.reset_and_configure_static_state()
+        # Habilitamos la recepción de digest.
         self.enable_digests()
 
         print('Plano de control configurado correctamente con routing dinámico habilitado.')
 
+        # se consultan los digest y se revisan los temporizadores de las rutas dinámicas.
         try:
             while True:
                 self.poll_digests()
@@ -593,9 +685,11 @@ class DynamicTelemetryController:
                 time.sleep(0.05)
         except KeyboardInterrupt:
             print('\nApagando controlador dinámico...')
+        # Cierra las conexiones con los switches al finalizar.
         finally:
             for controller in self.controllers.values():
-                controller.teardown()
+                if hasattr(controller, 'teardown'):
+                    controller.teardown()
 
 
 if __name__ == '__main__':

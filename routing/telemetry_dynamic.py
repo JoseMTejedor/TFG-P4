@@ -16,7 +16,7 @@ DB_FILE = 'telemetry.db'
 # Coste base por enlace entre switches, 
 # La unidad son us.
 # Valor estimado a partir de medidas RTT.
-BASE_LINK_DELAY = 1000
+BASE_LINK_DELAY = 1030
 
 # Número de muestras usadas para calcular la media del retardo.
 # Si para un puerto solo hay 5 muestras y N=30, se divide entre 30 igualmente.
@@ -135,6 +135,9 @@ def int_to_ip(ip_int):
 # clave en el diccionario de rutas dinámicas.
 def pair_key(src_ip, dst_ip):
     return tuple(sorted([src_ip, dst_ip]))
+
+def is_management_traffic(src_ip, dst_ip):
+    return src_ip.startswith('10.99.') or dst_ip.startswith('10.99.')
 
 # Los campos enviados por P4Runtime dentro del digest llegan como bytes.
 # Esta función interpreta esos bytes en orden de red,
@@ -333,7 +336,9 @@ class DynamicTelemetryController:
         samples = {}
 
         try:
-            conn = sqlite3.connect(DB_FILE)
+            # Se pone el timeout para evitar que se bloquee la lectura si se estaa escribiendo en la base de datos
+            conn = sqlite3.connect(DB_FILE, timeout = 2.0)
+            conn.execute('PRAGMA busy_timeout = 2000')
             cursor = conn.cursor()
             cursor.execute('''
                 SELECT switch_id, egress_port, ingress_egress_time, queue_time, src_ip, dst_ip
@@ -587,6 +592,10 @@ class DynamicTelemetryController:
     # Si el par de hosts es conocido y todavía no tiene ruta dinámica,
     # calcula el mejor camino e instala la ruta.
     def handle_new_flow(self, switch_id, src_ip, dst_ip):
+        
+        if is_management_traffic(src_ip, dst_ip):
+            return
+    
         # Comprobamos que ambos hosts son conocidos en la topología.
         if src_ip not in HOSTS or dst_ip not in HOSTS:
             print(f'Digest NEW_FLOW ignorado: host desconocido {src_ip} -> {dst_ip}')
@@ -605,6 +614,9 @@ class DynamicTelemetryController:
     # Si la ruta asociada al par de hosts está en probation, 
     # la ruta se renueva y vuelve al estado ACTIVE.
     def handle_flow_alive(self, switch_id, src_ip, dst_ip):
+        if is_management_traffic(src_ip, dst_ip):
+            return
+        
         key = pair_key(src_ip, dst_ip)
         state = self.dynamic_routes.get(key)
 
@@ -624,7 +636,8 @@ class DynamicTelemetryController:
     # de ruta activa durante probation.
     def poll_digests(self):
         for sw_id, controller in self.controllers.items():
-            digest_list = controller.get_digest_list(timeout=0)
+            # Lo pones a 0.01, ya que 0 no tiene el comportamiento esperado.
+            digest_list = controller.get_digest_list(timeout=0.01)
             if digest_list is None:
                 continue
 

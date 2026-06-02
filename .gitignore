@@ -1,0 +1,13 @@
+# Logs
+*.log
+routing/log/
+telemetry/log/
+
+# SQLite / bases de datos generadas
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+__pycache__/
+*.pyc

@@ -45,6 +45,8 @@ def start_collector():
 
     # Nos conectamos a la base de datos
     conn = sqlite3.connect(DB_FILE)
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA busy_timeout = 5000')
     cursor = conn.cursor()
 
     # Creamos un bucle infinito para capturar los paquetes

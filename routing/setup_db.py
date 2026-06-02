@@ -12,6 +12,9 @@ def init_database():
 
     # Al conectar SQLite crea el archivo automáticamente si no existe
     conn = sqlite3.connect(DB_FILE)
+    
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA busy_timeout = 2000')
     cursor = conn.cursor()
 
     # Creamos la tabla

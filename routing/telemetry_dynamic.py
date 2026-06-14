@@ -337,7 +337,7 @@ class DynamicTelemetryController:
 
         try:
             # Se pone el timeout para evitar que se bloquee la lectura si se estaa escribiendo en la base de datos
-            conn = sqlite3.connect(DB_FILE, timeout = 2.0)
+            conn = sqlite3.connect(DB_FILE)
             conn.execute('PRAGMA busy_timeout = 2000')
             cursor = conn.cursor()
             cursor.execute('''
@@ -469,10 +469,10 @@ class DynamicTelemetryController:
             improvement_rel >= THRESHOLD
             and improvement_abs >= MIN_IMPROVEMENT
         ):
-            print('Se selecciona la ruta dinámica alternativa.')
+            print('Se selecciona la ruta dinámica alternativa.', flush = True)
             return best_path
 
-        print('Se mantiene la ruta por defecto/corta.')
+        print('Se mantiene la ruta por defecto/corta.', flush = True)
         return default_path
     
     # -------------------------------------------------------------------------
@@ -543,7 +543,7 @@ class DynamicTelemetryController:
             expires_at=time.monotonic() + ROUTE_TTL,
         )
 
-        print(f'Ruta dinámica instalada para {src_ip} <-> {dst_ip}: {path}')
+        print(f'Ruta dinámica instalada para {src_ip} <-> {dst_ip}: {path}', flush = True)
 
     # Modificamos los switches de entrada de cada sentido para que
     # entren estado probation. Para saber si la ruta sigue activa o no. 
@@ -557,7 +557,7 @@ class DynamicTelemetryController:
         state.status = 'PROBATION'
         state.probe_until = time.monotonic() + PROBATION_WINDOW
 
-        print(f'Ruta {state.src_ip} <-> {state.dst_ip} en probation.')
+        print(f'Ruta {state.src_ip} <-> {state.dst_ip} en probation.', flush = True)
 
     # Renueva una ruta que estaba en probation porque se ha recibido tráfico nuevo.
     def renew_route(self, state):
@@ -570,7 +570,7 @@ class DynamicTelemetryController:
         state.expires_at = time.monotonic() + ROUTE_TTL
         state.probe_until = 0.0
 
-        print(f'Ruta {state.src_ip} <-> {state.dst_ip} renovada.')
+        print(f'Ruta {state.src_ip} <-> {state.dst_ip} renovada.', flush = True)
 
     # Elimina las reglas de flow_routing de ambos sentidos del tráfico en todos los switches,
     # borrando la ruta dinámica.
@@ -581,7 +581,7 @@ class DynamicTelemetryController:
         self.delete_direction(state.dst_ip, state.src_ip, reverse_path)
 
         del self.dynamic_routes[key]
-        print(f'Ruta {state.src_ip} <-> {state.dst_ip} eliminada por inactividad.')
+        print(f'Ruta {state.src_ip} <-> {state.dst_ip} eliminada por inactividad.', flush = True)
 
 
     # -------------------------------------------------------------------------
@@ -606,7 +606,7 @@ class DynamicTelemetryController:
             print(f'Digest NEW_FLOW ignorado: ya existe ruta para {src_ip} <-> {dst_ip}')
             return
 
-        print(f"Nuevo par detectado en {SWITCHES[switch_id]['name']}: {src_ip} -> {dst_ip}")
+        print(f"Nuevo par detectado en {SWITCHES[switch_id]['name']}: {src_ip} -> {dst_ip}", flush = True)
         path = self.choose_path(src_ip, dst_ip)
         self.install_bidirectional_route(src_ip, dst_ip, path)
 

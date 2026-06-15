@@ -895,6 +895,8 @@ const bit<8> SAMPLE_PERCENT = 8w10;
 // Tipos de digest enviados al controlador.
 const bit<8> DIGEST_NEW_FLOW = 8w1;
 const bit<8> DIGEST_FLOW_ALIVE = 8w2;
+// Puerto de telemetría para los switches P4
+const bit<9> TELEMETRY_PORT = 9w5;
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
@@ -966,6 +968,7 @@ struct flow_digest_t{
     bit<8> switch_id;
     ip4Addr_t src_ip;
     ip4Addr_t dst_ip;
+    bit<32> event_time;
 }
 
 // Metadatos propios del programa.
@@ -1131,7 +1134,9 @@ control MyIngress(inout headers hdr,
         // Cargamos el ID del switch nada más entrar al pipeline de ingress.
         switch_info.apply();
 
-        if (hdr.ipv4.isValid()) {
+        if (standard_metadata.ingress_port == TELEMETRY_PORT){
+            drop();
+        } else if (hdr.ipv4.isValid()) {
 
             // Si el paquete viene del host, no lleva la cabecera de medición, la añadimos.
             // Esto ocurre en el primer switch P4 que procesa el paquete.
@@ -1181,7 +1186,8 @@ control MyIngress(inout headers hdr,
                         DIGEST_NEW_FLOW,
                         meta.switch_id,
                         hdr.ipv4.srcAddr,
-                        hdr.ipv4.dstAddr
+                        hdr.ipv4.dstAddr,
+                        (bit<32>) standard_metadata.ingress_global_timestamp
                     });
                 }
 
@@ -1191,7 +1197,8 @@ control MyIngress(inout headers hdr,
                         DIGEST_FLOW_ALIVE,
                         meta.switch_id,
                         hdr.ipv4.srcAddr,
-                        hdr.ipv4.dstAddr
+                        hdr.ipv4.dstAddr,
+                        (bit<32>) standard_metadata.ingress_global_timestamp
                     });
                 }
             }

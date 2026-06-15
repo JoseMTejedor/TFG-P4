@@ -8,10 +8,12 @@
         ["tmp_0", 8, false],
         ["tmp_1", 32, false],
         ["tmp_2", 32, false],
-        ["tmp_3", 8, false],
+        ["tmp_3", 32, false],
         ["tmp_4", 8, false],
-        ["tmp_5", 32, false],
+        ["tmp_5", 8, false],
         ["tmp_6", 32, false],
+        ["tmp_7", 32, false],
+        ["tmp_8", 32, false],
         ["rand_val_0", 8, false],
         ["metadata.switch_id", 8, false],
         ["metadata.prev_switch_id_backup", 8, false],
@@ -336,7 +338,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "telemetry_dynamic.p4",
-        "line" : 526,
+        "line" : 533,
         "column" : 8,
         "source_fragment" : "MyDeparser"
       },
@@ -353,7 +355,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "telemetry_dynamic.p4",
-        "line" : 504,
+        "line" : 511,
         "column" : 8,
         "source_fragment" : "update_checksum( ..."
       },
@@ -426,6 +428,10 @@
         {
           "type" : "field",
           "value" : ["scalars", "tmp_2"]
+        },
+        {
+          "type" : "field",
+          "value" : ["scalars", "tmp_3"]
         }
       ]
     },
@@ -433,10 +439,6 @@
       "id" : 2,
       "name" : "flow_digest_t",
       "elements" : [
-        {
-          "type" : "field",
-          "value" : ["scalars", "tmp_3"]
-        },
         {
           "type" : "field",
           "value" : ["scalars", "tmp_4"]
@@ -448,6 +450,14 @@
         {
           "type" : "field",
           "value" : ["scalars", "tmp_6"]
+        },
+        {
+          "type" : "field",
+          "value" : ["scalars", "tmp_7"]
+        },
+        {
+          "type" : "field",
+          "value" : ["scalars", "tmp_8"]
         }
       ]
     }
@@ -486,7 +496,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 170,
+            "line" : 173,
             "column" : 8,
             "source_fragment" : "mark_to_drop(standard_metadata)"
           }
@@ -494,116 +504,23 @@
       ]
     },
     {
-      "name" : "MyIngress.ipv4_forward",
+      "name" : "MyIngress.drop",
       "id" : 4,
-      "runtime_data" : [
-        {
-          "name" : "dstAddr",
-          "bitwidth" : 48
-        },
-        {
-          "name" : "port",
-          "bitwidth" : 9
-        }
-      ],
+      "runtime_data" : [],
       "primitives" : [
         {
-          "op" : "assign",
+          "op" : "mark_to_drop",
           "parameters" : [
             {
-              "type" : "field",
-              "value" : ["standard_metadata", "egress_spec"]
-            },
-            {
-              "type" : "runtime_data",
-              "value" : 1
+              "type" : "header",
+              "value" : "standard_metadata"
             }
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 174,
+            "line" : 173,
             "column" : 8,
-            "source_fragment" : "standard_metadata.egress_spec = port"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["ethernet", "srcAddr"]
-            },
-            {
-              "type" : "field",
-              "value" : ["ethernet", "dstAddr"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "telemetry_dynamic.p4",
-            "line" : 175,
-            "column" : 8,
-            "source_fragment" : "hdr.ethernet.srcAddr = hdr.ethernet.dstAddr"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["ethernet", "dstAddr"]
-            },
-            {
-              "type" : "runtime_data",
-              "value" : 0
-            }
-          ],
-          "source_info" : {
-            "filename" : "telemetry_dynamic.p4",
-            "line" : 176,
-            "column" : 8,
-            "source_fragment" : "hdr.ethernet.dstAddr = dstAddr"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["ipv4", "ttl"]
-            },
-            {
-              "type" : "expression",
-              "value" : {
-                "type" : "expression",
-                "value" : {
-                  "op" : "&",
-                  "left" : {
-                    "type" : "expression",
-                    "value" : {
-                      "op" : "+",
-                      "left" : {
-                        "type" : "field",
-                        "value" : ["ipv4", "ttl"]
-                      },
-                      "right" : {
-                        "type" : "hexstr",
-                        "value" : "0xff"
-                      }
-                    }
-                  },
-                  "right" : {
-                    "type" : "hexstr",
-                    "value" : "0xff"
-                  }
-                }
-              }
-            }
-          ],
-          "source_info" : {
-            "filename" : "telemetry_dynamic.p4",
-            "line" : 177,
-            "column" : 8,
-            "source_fragment" : "hdr.ipv4.ttl = hdr.ipv4.ttl - 1"
+            "source_fragment" : "mark_to_drop(standard_metadata)"
           }
         }
       ]
@@ -636,7 +553,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 174,
+            "line" : 177,
             "column" : 8,
             "source_fragment" : "standard_metadata.egress_spec = port"
           }
@@ -655,7 +572,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 175,
+            "line" : 178,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.srcAddr = hdr.ethernet.dstAddr"
           }
@@ -674,7 +591,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 176,
+            "line" : 179,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.dstAddr = dstAddr"
           }
@@ -716,7 +633,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 177,
+            "line" : 180,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.ttl = hdr.ipv4.ttl - 1"
           }
@@ -724,39 +641,8 @@
       ]
     },
     {
-      "name" : "MyIngress.set_switch_id",
+      "name" : "MyIngress.ipv4_forward",
       "id" : 6,
-      "runtime_data" : [
-        {
-          "name" : "sw_id",
-          "bitwidth" : 8
-        }
-      ],
-      "primitives" : [
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "metadata.switch_id"]
-            },
-            {
-              "type" : "runtime_data",
-              "value" : 0
-            }
-          ],
-          "source_info" : {
-            "filename" : "telemetry_dynamic.p4",
-            "line" : 184,
-            "column" : 8,
-            "source_fragment" : "meta.switch_id = sw_id"
-          }
-        }
-      ]
-    },
-    {
-      "name" : "MyIngress.ipv4_forward_probe",
-      "id" : 7,
       "runtime_data" : [
         {
           "name" : "dstAddr",
@@ -782,7 +668,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 191,
+            "line" : 177,
             "column" : 8,
             "source_fragment" : "standard_metadata.egress_spec = port"
           }
@@ -801,7 +687,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 192,
+            "line" : 178,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.srcAddr = hdr.ethernet.dstAddr"
           }
@@ -820,7 +706,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 193,
+            "line" : 179,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.dstAddr = dstAddr"
           }
@@ -862,7 +748,153 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
+            "line" : 180,
+            "column" : 8,
+            "source_fragment" : "hdr.ipv4.ttl = hdr.ipv4.ttl - 1"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "MyIngress.set_switch_id",
+      "id" : 7,
+      "runtime_data" : [
+        {
+          "name" : "sw_id",
+          "bitwidth" : 8
+        }
+      ],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "metadata.switch_id"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 0
+            }
+          ],
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 187,
+            "column" : 8,
+            "source_fragment" : "meta.switch_id = sw_id"
+          }
+        }
+      ]
+    },
+    {
+      "name" : "MyIngress.ipv4_forward_probe",
+      "id" : 8,
+      "runtime_data" : [
+        {
+          "name" : "dstAddr",
+          "bitwidth" : 48
+        },
+        {
+          "name" : "port",
+          "bitwidth" : 9
+        }
+      ],
+      "primitives" : [
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["standard_metadata", "egress_spec"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 1
+            }
+          ],
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
             "line" : 194,
+            "column" : 8,
+            "source_fragment" : "standard_metadata.egress_spec = port"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["ethernet", "srcAddr"]
+            },
+            {
+              "type" : "field",
+              "value" : ["ethernet", "dstAddr"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 195,
+            "column" : 8,
+            "source_fragment" : "hdr.ethernet.srcAddr = hdr.ethernet.dstAddr"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["ethernet", "dstAddr"]
+            },
+            {
+              "type" : "runtime_data",
+              "value" : 0
+            }
+          ],
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 196,
+            "column" : 8,
+            "source_fragment" : "hdr.ethernet.dstAddr = dstAddr"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["ipv4", "ttl"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "&",
+                  "left" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "+",
+                      "left" : {
+                        "type" : "field",
+                        "value" : ["ipv4", "ttl"]
+                      },
+                      "right" : {
+                        "type" : "hexstr",
+                        "value" : "0xff"
+                      }
+                    }
+                  },
+                  "right" : {
+                    "type" : "hexstr",
+                    "value" : "0xff"
+                  }
+                }
+              }
+            }
+          ],
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 197,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.ttl = hdr.ipv4.ttl - 1"
           }
@@ -881,7 +913,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 196,
+            "line" : 199,
             "column" : 8,
             "source_fragment" : "meta.send_alive_digest = 1w1"
           }
@@ -889,8 +921,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic244",
-      "id" : 8,
+      "name" : "telemetry_dynamic247",
+      "id" : 9,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -907,7 +939,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 244,
+            "line" : 247,
             "column" : 8,
             "source_fragment" : "meta.first_p4_switch = 1w0"
           }
@@ -926,7 +958,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 245,
+            "line" : 248,
             "column" : 8,
             "source_fragment" : "meta.send_new_flow_digest = 1w0"
           }
@@ -945,7 +977,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 246,
+            "line" : 249,
             "column" : 8,
             "source_fragment" : "meta.send_alive_digest = 1w0"
           }
@@ -953,8 +985,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic257",
-      "id" : 9,
+      "name" : "telemetry_dynamic262",
+      "id" : 10,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -971,7 +1003,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 257,
+            "line" : 262,
             "column" : 16,
             "source_fragment" : "meta.first_p4_switch = 1w1"
           }
@@ -986,7 +1018,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 259,
+            "line" : 264,
             "column" : 16,
             "source_fragment" : "hdr.measurement.setValid()"
           }
@@ -1005,7 +1037,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 264,
+            "line" : 269,
             "column" : 16,
             "source_fragment" : "hdr.measurement.ingress_egress_time = 32w0"
           }
@@ -1024,7 +1056,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 265,
+            "line" : 270,
             "column" : 16,
             "source_fragment" : "hdr.measurement.queue_time = 32w0"
           }
@@ -1043,7 +1075,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 266,
+            "line" : 271,
             "column" : 16,
             "source_fragment" : "hdr.measurement.accum_time = 32w0"
           }
@@ -1062,7 +1094,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 267,
+            "line" : 272,
             "column" : 16,
             "source_fragment" : "hdr.measurement.prev_egress_t = 48w0"
           }
@@ -1081,7 +1113,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 268,
+            "line" : 273,
             "column" : 16,
             "source_fragment" : "hdr.measurement.link_time = 32w0"
           }
@@ -1100,7 +1132,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 269,
+            "line" : 274,
             "column" : 16,
             "source_fragment" : "hdr.measurement.prev_switch_id = 8w0"
           }
@@ -1127,8 +1159,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic284",
-      "id" : 10,
+      "name" : "telemetry_dynamic289",
+      "id" : 11,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -1145,7 +1177,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 284,
+            "line" : 289,
             "column" : 20,
             "source_fragment" : "meta.send_new_flow_digest = 1w1"
           }
@@ -1153,8 +1185,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic297",
-      "id" : 11,
+      "name" : "telemetry_dynamic302",
+      "id" : 12,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -1190,7 +1222,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 299,
+            "line" : 304,
             "column" : 24,
             "source_fragment" : "meta.switch_id"
           }
@@ -1209,7 +1241,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 300,
+            "line" : 305,
             "column" : 24,
             "source_fragment" : "hdr.ipv4.srcAddr"
           }
@@ -1228,9 +1260,51 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 301,
+            "line" : 306,
             "column" : 24,
             "source_fragment" : "hdr.ipv4.dstAddr"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "tmp_3"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "&",
+                  "left" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "&",
+                      "left" : {
+                        "type" : "field",
+                        "value" : ["standard_metadata", "ingress_global_timestamp"]
+                      },
+                      "right" : {
+                        "type" : "hexstr",
+                        "value" : "0x0000ffffffff"
+                      }
+                    }
+                  },
+                  "right" : {
+                    "type" : "hexstr",
+                    "value" : "0xffffffff"
+                  }
+                }
+              }
+            }
+          ],
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 307,
+            "column" : 24,
+            "source_fragment" : "(bit<32>) standard_metadata.ingress_global_timestamp"
           }
         },
         {
@@ -1247,7 +1321,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 297,
+            "line" : 302,
             "column" : 20,
             "source_fragment" : "digest<flow_digest_t>(1, { ..."
           }
@@ -1255,8 +1329,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic307",
-      "id" : 12,
+      "name" : "telemetry_dynamic313",
+      "id" : 13,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -1264,7 +1338,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "tmp_3"]
+              "value" : ["scalars", "tmp_4"]
             },
             {
               "type" : "hexstr",
@@ -1283,7 +1357,7 @@
           "parameters" : [
             {
               "type" : "field",
-              "value" : ["scalars", "tmp_4"]
+              "value" : ["scalars", "tmp_5"]
             },
             {
               "type" : "field",
@@ -1292,28 +1366,9 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 309,
+            "line" : 315,
             "column" : 24,
             "source_fragment" : "meta.switch_id"
-          }
-        },
-        {
-          "op" : "assign",
-          "parameters" : [
-            {
-              "type" : "field",
-              "value" : ["scalars", "tmp_5"]
-            },
-            {
-              "type" : "field",
-              "value" : ["ipv4", "srcAddr"]
-            }
-          ],
-          "source_info" : {
-            "filename" : "telemetry_dynamic.p4",
-            "line" : 310,
-            "column" : 24,
-            "source_fragment" : "hdr.ipv4.srcAddr"
           }
         },
         {
@@ -1325,14 +1380,75 @@
             },
             {
               "type" : "field",
+              "value" : ["ipv4", "srcAddr"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 316,
+            "column" : 24,
+            "source_fragment" : "hdr.ipv4.srcAddr"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "tmp_7"]
+            },
+            {
+              "type" : "field",
               "value" : ["ipv4", "dstAddr"]
             }
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 311,
+            "line" : 317,
             "column" : 24,
             "source_fragment" : "hdr.ipv4.dstAddr"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "tmp_8"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "&",
+                  "left" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "&",
+                      "left" : {
+                        "type" : "field",
+                        "value" : ["standard_metadata", "ingress_global_timestamp"]
+                      },
+                      "right" : {
+                        "type" : "hexstr",
+                        "value" : "0x0000ffffffff"
+                      }
+                    }
+                  },
+                  "right" : {
+                    "type" : "hexstr",
+                    "value" : "0xffffffff"
+                  }
+                }
+              }
+            }
+          ],
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 318,
+            "column" : 24,
+            "source_fragment" : "(bit<32>) standard_metadata.ingress_global_timestamp"
           }
         },
         {
@@ -1349,7 +1465,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 307,
+            "line" : 313,
             "column" : 20,
             "source_fragment" : "digest<flow_digest_t>(1, { ..."
           }
@@ -1358,19 +1474,19 @@
     },
     {
       "name" : "NoAction",
-      "id" : 13,
-      "runtime_data" : [],
-      "primitives" : []
-    },
-    {
-      "name" : "NoAction",
       "id" : 14,
       "runtime_data" : [],
       "primitives" : []
     },
     {
-      "name" : "MyEgress.remove_header",
+      "name" : "NoAction",
       "id" : 15,
+      "runtime_data" : [],
+      "primitives" : []
+    },
+    {
+      "name" : "MyEgress.remove_header",
+      "id" : 16,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -1383,7 +1499,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 330,
+            "line" : 337,
             "column" : 8,
             "source_fragment" : "hdr.measurement.setInvalid()"
           }
@@ -1411,7 +1527,7 @@
     },
     {
       "name" : "MyEgress.route_telemetry",
-      "id" : 16,
+      "id" : 17,
       "runtime_data" : [
         {
           "name" : "dst_mac",
@@ -1441,7 +1557,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 352,
+            "line" : 359,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.dstAddr = dst_mac"
           }
@@ -1460,7 +1576,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 353,
+            "line" : 360,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.dstAddr = dst_ip"
           }
@@ -1479,7 +1595,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 354,
+            "line" : 361,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.srcAddr = src_ip"
           }
@@ -1487,8 +1603,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic395",
-      "id" : 17,
+      "name" : "telemetry_dynamic402",
+      "id" : 18,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -1548,7 +1664,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 395,
+            "line" : 402,
             "column" : 20,
             "source_fragment" : "hdr.measurement.link_time = (bit<32>)(current_ingress - hdr.measurement.prev_egress_t)"
           }
@@ -1556,8 +1672,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic397",
-      "id" : 18,
+      "name" : "telemetry_dynamic404",
+      "id" : 19,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -1574,7 +1690,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 397,
+            "line" : 404,
             "column" : 20,
             "source_fragment" : "hdr.measurement.link_time = 32w0"
           }
@@ -1582,8 +1698,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic381",
-      "id" : 19,
+      "name" : "telemetry_dynamic388",
+      "id" : 20,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -1643,7 +1759,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 381,
+            "line" : 388,
             "column" : 16,
             "source_fragment" : "hdr.measurement.ingress_egress_time = delta"
           }
@@ -1662,7 +1778,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 384,
+            "line" : 391,
             "column" : 16,
             "source_fragment" : "hdr.measurement.queue_time = standard_metadata.deq_timedelta"
           }
@@ -1670,8 +1786,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic421",
-      "id" : 20,
+      "name" : "telemetry_dynamic428",
+      "id" : 21,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -1688,7 +1804,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 421,
+            "line" : 428,
             "column" : 20,
             "source_fragment" : "meta.prev_switch_id_backup = hdr.measurement.prev_switch_id"
           }
@@ -1750,7 +1866,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 426,
+            "line" : 433,
             "column" : 20,
             "source_fragment" : "meta.ingress_egress_time_backup = hdr.measurement.ingress_egress_time"
           }
@@ -1769,7 +1885,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 427,
+            "line" : 434,
             "column" : 20,
             "source_fragment" : "meta.queue_time_backup = hdr.measurement.queue_time"
           }
@@ -1788,7 +1904,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 428,
+            "line" : 435,
             "column" : 20,
             "source_fragment" : "meta.accum_time_backup = hdr.measurement.accum_time"
           }
@@ -1807,7 +1923,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 429,
+            "line" : 436,
             "column" : 20,
             "source_fragment" : "meta.link_time_backup = hdr.measurement.link_time"
           }
@@ -1839,7 +1955,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 430,
+            "line" : 437,
             "column" : 20,
             "source_fragment" : "meta.egress_port_backup = (bit<16>)standard_metadata.egress_port"
           }
@@ -1871,7 +1987,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 431,
+            "line" : 438,
             "column" : 20,
             "source_fragment" : "meta.q_depth_backup = (bit<32>)standard_metadata.deq_qdepth"
           }
@@ -1890,7 +2006,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 432,
+            "line" : 439,
             "column" : 20,
             "source_fragment" : "meta.src_ip_backup = hdr.ipv4.srcAddr"
           }
@@ -1909,7 +2025,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 433,
+            "line" : 440,
             "column" : 20,
             "source_fragment" : "meta.dst_ip_backup = hdr.ipv4.dstAddr"
           }
@@ -1928,7 +2044,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 437,
+            "line" : 444,
             "column" : 20,
             "source_fragment" : "clone_preserving_field_list(CloneType.E2E, 500, 1)"
           }
@@ -1936,8 +2052,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic407",
-      "id" : 21,
+      "name" : "telemetry_dynamic414",
+      "id" : 22,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -2017,7 +2133,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 407,
+            "line" : 414,
             "column" : 16,
             "source_fragment" : "hdr.measurement.accum_time = hdr.measurement.accum_time + delta"
           }
@@ -2036,7 +2152,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 410,
+            "line" : 417,
             "column" : 16,
             "source_fragment" : "hdr.measurement.prev_egress_t = current_egress"
           }
@@ -2059,7 +2175,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 417,
+            "line" : 424,
             "column" : 16,
             "source_fragment" : "random<bit<8>>(rand_val, 8w1, 8w100)"
           }
@@ -2067,8 +2183,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic442",
-      "id" : 22,
+      "name" : "telemetry_dynamic449",
+      "id" : 23,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -2085,7 +2201,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 442,
+            "line" : 449,
             "column" : 16,
             "source_fragment" : "hdr.measurement.prev_switch_id = meta.switch_id"
           }
@@ -2093,8 +2209,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic456",
-      "id" : 23,
+      "name" : "telemetry_dynamic463",
+      "id" : 24,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -2107,7 +2223,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 456,
+            "line" : 463,
             "column" : 12,
             "source_fragment" : "hdr.measurement.setInvalid()"
           }
@@ -2122,7 +2238,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 457,
+            "line" : 464,
             "column" : 12,
             "source_fragment" : "hdr.udp.setValid()"
           }
@@ -2137,7 +2253,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 458,
+            "line" : 465,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.setValid()"
           }
@@ -2156,7 +2272,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 461,
+            "line" : 468,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.switch_id = meta.switch_id"
           }
@@ -2175,7 +2291,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 462,
+            "line" : 469,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.prev_switch_id = meta.prev_switch_id_backup"
           }
@@ -2194,7 +2310,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 463,
+            "line" : 470,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.ingress_egress_time = meta.ingress_egress_time_backup"
           }
@@ -2213,7 +2329,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 464,
+            "line" : 471,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.queue_time = meta.queue_time_backup"
           }
@@ -2232,7 +2348,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 465,
+            "line" : 472,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.accum_time = meta.accum_time_backup"
           }
@@ -2251,7 +2367,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 466,
+            "line" : 473,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.link_time = meta.link_time_backup"
           }
@@ -2270,7 +2386,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 467,
+            "line" : 474,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.egress_port = meta.egress_port_backup"
           }
@@ -2289,7 +2405,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 468,
+            "line" : 475,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.q_depth = meta.q_depth_backup"
           }
@@ -2308,7 +2424,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 469,
+            "line" : 476,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.src_ip = meta.src_ip_backup"
           }
@@ -2327,7 +2443,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 470,
+            "line" : 477,
             "column" : 12,
             "source_fragment" : "hdr.telemetry.dst_ip = meta.dst_ip_backup"
           }
@@ -2384,7 +2500,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 477,
+            "line" : 484,
             "column" : 12,
             "source_fragment" : "hdr.ipv4.totalLen = 60"
           }
@@ -2392,8 +2508,8 @@
       ]
     },
     {
-      "name" : "telemetry_dynamic483",
-      "id" : 24,
+      "name" : "telemetry_dynamic490",
+      "id" : 25,
       "runtime_data" : [],
       "primitives" : [
         {
@@ -2410,7 +2526,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 483,
+            "line" : 490,
             "column" : 12,
             "source_fragment" : "hdr.udp.srcPort = 12345"
           }
@@ -2429,7 +2545,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 485,
+            "line" : 492,
             "column" : 12,
             "source_fragment" : "hdr.udp.dstPort = 8192"
           }
@@ -2448,7 +2564,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 487,
+            "line" : 494,
             "column" : 12,
             "source_fragment" : "hdr.udp.length_ = 40"
           }
@@ -2467,7 +2583,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 489,
+            "line" : 496,
             "column" : 12,
             "source_fragment" : "hdr.udp.checksum = 0"
           }
@@ -2482,7 +2598,7 @@
           ],
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 493,
+            "line" : 500,
             "column" : 12,
             "source_fragment" : "truncate(74)"
           }
@@ -2496,18 +2612,18 @@
       "id" : 0,
       "source_info" : {
         "filename" : "telemetry_dynamic.p4",
-        "line" : 166,
+        "line" : 169,
         "column" : 8,
         "source_fragment" : "MyIngress"
       },
-      "init_table" : "tbl_telemetry_dynamic244",
+      "init_table" : "tbl_telemetry_dynamic247",
       "tables" : [
         {
-          "name" : "tbl_telemetry_dynamic244",
+          "name" : "tbl_telemetry_dynamic247",
           "id" : 0,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 244,
+            "line" : 247,
             "column" : 29,
             "source_fragment" : "= 1w0; ..."
           },
@@ -2518,14 +2634,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [8],
-          "actions" : ["telemetry_dynamic244"],
+          "action_ids" : [9],
+          "actions" : ["telemetry_dynamic247"],
           "base_default_next" : "MyIngress.switch_info",
           "next_tables" : {
-            "telemetry_dynamic244" : "MyIngress.switch_info"
+            "telemetry_dynamic247" : "MyIngress.switch_info"
           },
           "default_entry" : {
-            "action_id" : 8,
+            "action_id" : 9,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -2536,7 +2652,7 @@
           "id" : 1,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 216,
+            "line" : 219,
             "column" : 10,
             "source_fragment" : "switch_info"
           },
@@ -2547,7 +2663,7 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [6, 1],
+          "action_ids" : [7, 1],
           "actions" : ["MyIngress.set_switch_id", "NoAction"],
           "base_default_next" : "node_4",
           "next_tables" : {
@@ -2562,11 +2678,40 @@
           }
         },
         {
-          "name" : "tbl_telemetry_dynamic257",
+          "name" : "tbl_drop",
           "id" : 2,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 257,
+            "line" : 255,
+            "column" : 12,
+            "source_fragment" : "drop()"
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [4],
+          "actions" : ["MyIngress.drop"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "MyIngress.drop" : null
+          },
+          "default_entry" : {
+            "action_id" : 4,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_telemetry_dynamic262",
+          "id" : 3,
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 262,
             "column" : 37,
             "source_fragment" : "= 1w1; ..."
           },
@@ -2577,14 +2722,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [9],
-          "actions" : ["telemetry_dynamic257"],
+          "action_ids" : [10],
+          "actions" : ["telemetry_dynamic262"],
           "base_default_next" : "MyIngress.flow_routing",
           "next_tables" : {
-            "telemetry_dynamic257" : "MyIngress.flow_routing"
+            "telemetry_dynamic262" : "MyIngress.flow_routing"
           },
           "default_entry" : {
-            "action_id" : 9,
+            "action_id" : 10,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -2592,10 +2737,10 @@
         },
         {
           "name" : "MyIngress.flow_routing",
-          "id" : 3,
+          "id" : 4,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 227,
+            "line" : 230,
             "column" : 10,
             "source_fragment" : "flow_routing"
           },
@@ -2619,12 +2764,12 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [5, 7, 2],
+          "action_ids" : [6, 8, 2],
           "actions" : ["MyIngress.ipv4_forward", "MyIngress.ipv4_forward_probe", "NoAction"],
           "base_default_next" : null,
           "next_tables" : {
-            "__MISS__" : "node_8",
-            "__HIT__" : "node_11"
+            "__MISS__" : "node_10",
+            "__HIT__" : "node_13"
           },
           "default_entry" : {
             "action_id" : 2,
@@ -2634,11 +2779,11 @@
           }
         },
         {
-          "name" : "tbl_telemetry_dynamic284",
-          "id" : 4,
+          "name" : "tbl_telemetry_dynamic289",
+          "id" : 5,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 284,
+            "line" : 289,
             "column" : 46,
             "source_fragment" : "="
           },
@@ -2649,14 +2794,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [10],
-          "actions" : ["telemetry_dynamic284"],
+          "action_ids" : [11],
+          "actions" : ["telemetry_dynamic289"],
           "base_default_next" : "MyIngress.ipv4_lpm",
           "next_tables" : {
-            "telemetry_dynamic284" : "MyIngress.ipv4_lpm"
+            "telemetry_dynamic289" : "MyIngress.ipv4_lpm"
           },
           "default_entry" : {
-            "action_id" : 10,
+            "action_id" : 11,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -2664,10 +2809,10 @@
         },
         {
           "name" : "MyIngress.ipv4_lpm",
-          "id" : 5,
+          "id" : 6,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 199,
+            "line" : 202,
             "column" : 10,
             "source_fragment" : "ipv4_lpm"
           },
@@ -2685,13 +2830,13 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [4, 3, 0],
+          "action_ids" : [5, 3, 0],
           "actions" : ["MyIngress.ipv4_forward", "MyIngress.drop", "NoAction"],
-          "base_default_next" : "node_11",
+          "base_default_next" : "node_13",
           "next_tables" : {
-            "MyIngress.ipv4_forward" : "node_11",
-            "MyIngress.drop" : "node_11",
-            "NoAction" : "node_11"
+            "MyIngress.ipv4_forward" : "node_13",
+            "MyIngress.drop" : "node_13",
+            "NoAction" : "node_13"
           },
           "default_entry" : {
             "action_id" : 3,
@@ -2701,40 +2846,11 @@
           }
         },
         {
-          "name" : "tbl_telemetry_dynamic297",
-          "id" : 6,
-          "source_info" : {
-            "filename" : "telemetry_dynamic.p4",
-            "line" : 297,
-            "column" : 20,
-            "source_fragment" : "digest<flow_digest_t>(1, { ..."
-          },
-          "key" : [],
-          "match_type" : "exact",
-          "type" : "simple",
-          "max_size" : 1024,
-          "with_counters" : false,
-          "support_timeout" : false,
-          "direct_meters" : null,
-          "action_ids" : [11],
-          "actions" : ["telemetry_dynamic297"],
-          "base_default_next" : "node_14",
-          "next_tables" : {
-            "telemetry_dynamic297" : "node_14"
-          },
-          "default_entry" : {
-            "action_id" : 11,
-            "action_const" : true,
-            "action_data" : [],
-            "action_entry_const" : true
-          }
-        },
-        {
-          "name" : "tbl_telemetry_dynamic307",
+          "name" : "tbl_telemetry_dynamic302",
           "id" : 7,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 307,
+            "line" : 302,
             "column" : 20,
             "source_fragment" : "digest<flow_digest_t>(1, { ..."
           },
@@ -2746,13 +2862,42 @@
           "support_timeout" : false,
           "direct_meters" : null,
           "action_ids" : [12],
-          "actions" : ["telemetry_dynamic307"],
-          "base_default_next" : null,
+          "actions" : ["telemetry_dynamic302"],
+          "base_default_next" : "node_16",
           "next_tables" : {
-            "telemetry_dynamic307" : null
+            "telemetry_dynamic302" : "node_16"
           },
           "default_entry" : {
             "action_id" : 12,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_telemetry_dynamic313",
+          "id" : 8,
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 313,
+            "column" : 20,
+            "source_fragment" : "digest<flow_digest_t>(1, { ..."
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [13],
+          "actions" : ["telemetry_dynamic313"],
+          "base_default_next" : null,
+          "next_tables" : {
+            "telemetry_dynamic313" : null
+          },
+          "default_entry" : {
+            "action_id" : 13,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -2766,8 +2911,34 @@
           "id" : 0,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 251,
+            "line" : 254,
             "column" : 12,
+            "source_fragment" : "standard_metadata.ingress_port == TELEMETRY_PORT"
+          },
+          "expression" : {
+            "type" : "expression",
+            "value" : {
+              "op" : "==",
+              "left" : {
+                "type" : "field",
+                "value" : ["standard_metadata", "ingress_port"]
+              },
+              "right" : {
+                "type" : "hexstr",
+                "value" : "0x0005"
+              }
+            }
+          },
+          "true_next" : "tbl_drop",
+          "false_next" : "node_6"
+        },
+        {
+          "name" : "node_6",
+          "id" : 1,
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 256,
+            "column" : 19,
             "source_fragment" : "hdr.ipv4.isValid()"
           },
           "expression" : {
@@ -2782,14 +2953,14 @@
             }
           },
           "false_next" : null,
-          "true_next" : "node_5"
+          "true_next" : "node_7"
         },
         {
-          "name" : "node_5",
-          "id" : 1,
+          "name" : "node_7",
+          "id" : 2,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 255,
+            "line" : 260,
             "column" : 17,
             "source_fragment" : "hdr.measurement.isValid()"
           },
@@ -2804,15 +2975,15 @@
               }
             }
           },
-          "false_next" : "tbl_telemetry_dynamic257",
+          "false_next" : "tbl_telemetry_dynamic262",
           "true_next" : "MyIngress.flow_routing"
         },
         {
-          "name" : "node_8",
-          "id" : 2,
+          "name" : "node_10",
+          "id" : 3,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 282,
+            "line" : 287,
             "column" : 20,
             "source_fragment" : "meta.first_p4_switch == 1w1"
           },
@@ -2830,15 +3001,15 @@
               }
             }
           },
-          "true_next" : "tbl_telemetry_dynamic284",
+          "true_next" : "tbl_telemetry_dynamic289",
           "false_next" : "MyIngress.ipv4_lpm"
         },
         {
-          "name" : "node_11",
-          "id" : 3,
+          "name" : "node_13",
+          "id" : 4,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 293,
+            "line" : 298,
             "column" : 16,
             "source_fragment" : "meta.first_p4_switch == 1w1"
           },
@@ -2857,14 +3028,14 @@
             }
           },
           "false_next" : null,
-          "true_next" : "node_12"
+          "true_next" : "node_14"
         },
         {
-          "name" : "node_12",
-          "id" : 4,
+          "name" : "node_14",
+          "id" : 5,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 295,
+            "line" : 300,
             "column" : 20,
             "source_fragment" : "meta.send_new_flow_digest == 1w1"
           },
@@ -2882,15 +3053,15 @@
               }
             }
           },
-          "true_next" : "tbl_telemetry_dynamic297",
-          "false_next" : "node_14"
+          "true_next" : "tbl_telemetry_dynamic302",
+          "false_next" : "node_16"
         },
         {
-          "name" : "node_14",
-          "id" : 5,
+          "name" : "node_16",
+          "id" : 6,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 305,
+            "line" : 311,
             "column" : 20,
             "source_fragment" : "meta.send_alive_digest == 1w1"
           },
@@ -2909,7 +3080,7 @@
             }
           },
           "false_next" : null,
-          "true_next" : "tbl_telemetry_dynamic307"
+          "true_next" : "tbl_telemetry_dynamic313"
         }
       ]
     },
@@ -2918,18 +3089,18 @@
       "id" : 1,
       "source_info" : {
         "filename" : "telemetry_dynamic.p4",
-        "line" : 323,
+        "line" : 330,
         "column" : 8,
         "source_fragment" : "MyEgress"
       },
-      "init_table" : "node_18",
+      "init_table" : "node_20",
       "tables" : [
         {
-          "name" : "tbl_telemetry_dynamic381",
-          "id" : 8,
+          "name" : "tbl_telemetry_dynamic388",
+          "id" : 9,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 381,
+            "line" : 388,
             "column" : 52,
             "source_fragment" : "= delta; ..."
           },
@@ -2940,54 +3111,25 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [19],
-          "actions" : ["telemetry_dynamic381"],
-          "base_default_next" : "node_21",
+          "action_ids" : [20],
+          "actions" : ["telemetry_dynamic388"],
+          "base_default_next" : "node_23",
           "next_tables" : {
-            "telemetry_dynamic381" : "node_21"
+            "telemetry_dynamic388" : "node_23"
           },
           "default_entry" : {
-            "action_id" : 19,
+            "action_id" : 20,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
           }
         },
         {
-          "name" : "tbl_telemetry_dynamic395",
-          "id" : 9,
-          "source_info" : {
-            "filename" : "telemetry_dynamic.p4",
-            "line" : 395,
-            "column" : 46,
-            "source_fragment" : "="
-          },
-          "key" : [],
-          "match_type" : "exact",
-          "type" : "simple",
-          "max_size" : 1024,
-          "with_counters" : false,
-          "support_timeout" : false,
-          "direct_meters" : null,
-          "action_ids" : [17],
-          "actions" : ["telemetry_dynamic395"],
-          "base_default_next" : "tbl_telemetry_dynamic407",
-          "next_tables" : {
-            "telemetry_dynamic395" : "tbl_telemetry_dynamic407"
-          },
-          "default_entry" : {
-            "action_id" : 17,
-            "action_const" : true,
-            "action_data" : [],
-            "action_entry_const" : true
-          }
-        },
-        {
-          "name" : "tbl_telemetry_dynamic397",
+          "name" : "tbl_telemetry_dynamic402",
           "id" : 10,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 397,
+            "line" : 402,
             "column" : 46,
             "source_fragment" : "="
           },
@@ -2999,10 +3141,10 @@
           "support_timeout" : false,
           "direct_meters" : null,
           "action_ids" : [18],
-          "actions" : ["telemetry_dynamic397"],
-          "base_default_next" : "tbl_telemetry_dynamic407",
+          "actions" : ["telemetry_dynamic402"],
+          "base_default_next" : "tbl_telemetry_dynamic414",
           "next_tables" : {
-            "telemetry_dynamic397" : "tbl_telemetry_dynamic407"
+            "telemetry_dynamic402" : "tbl_telemetry_dynamic414"
           },
           "default_entry" : {
             "action_id" : 18,
@@ -3012,11 +3154,40 @@
           }
         },
         {
-          "name" : "tbl_telemetry_dynamic407",
+          "name" : "tbl_telemetry_dynamic404",
           "id" : 11,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 407,
+            "line" : 404,
+            "column" : 46,
+            "source_fragment" : "="
+          },
+          "key" : [],
+          "match_type" : "exact",
+          "type" : "simple",
+          "max_size" : 1024,
+          "with_counters" : false,
+          "support_timeout" : false,
+          "direct_meters" : null,
+          "action_ids" : [19],
+          "actions" : ["telemetry_dynamic404"],
+          "base_default_next" : "tbl_telemetry_dynamic414",
+          "next_tables" : {
+            "telemetry_dynamic404" : "tbl_telemetry_dynamic414"
+          },
+          "default_entry" : {
+            "action_id" : 19,
+            "action_const" : true,
+            "action_data" : [],
+            "action_entry_const" : true
+          }
+        },
+        {
+          "name" : "tbl_telemetry_dynamic414",
+          "id" : 12,
+          "source_info" : {
+            "filename" : "telemetry_dynamic.p4",
+            "line" : 414,
             "column" : 43,
             "source_fragment" : "= hdr.measurement.accum_time + delta; ..."
           },
@@ -3027,25 +3198,25 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [21],
-          "actions" : ["telemetry_dynamic407"],
-          "base_default_next" : "node_25",
+          "action_ids" : [22],
+          "actions" : ["telemetry_dynamic414"],
+          "base_default_next" : "node_27",
           "next_tables" : {
-            "telemetry_dynamic407" : "node_25"
+            "telemetry_dynamic414" : "node_27"
           },
           "default_entry" : {
-            "action_id" : 21,
+            "action_id" : 22,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
           }
         },
         {
-          "name" : "tbl_telemetry_dynamic421",
-          "id" : 12,
+          "name" : "tbl_telemetry_dynamic428",
+          "id" : 13,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 421,
+            "line" : 428,
             "column" : 47,
             "source_fragment" : "= hdr.measurement.prev_switch_id; ..."
           },
@@ -3056,25 +3227,25 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [20],
-          "actions" : ["telemetry_dynamic421"],
-          "base_default_next" : "tbl_telemetry_dynamic442",
+          "action_ids" : [21],
+          "actions" : ["telemetry_dynamic428"],
+          "base_default_next" : "tbl_telemetry_dynamic449",
           "next_tables" : {
-            "telemetry_dynamic421" : "tbl_telemetry_dynamic442"
+            "telemetry_dynamic428" : "tbl_telemetry_dynamic449"
           },
           "default_entry" : {
-            "action_id" : 20,
+            "action_id" : 21,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
           }
         },
         {
-          "name" : "tbl_telemetry_dynamic442",
-          "id" : 13,
+          "name" : "tbl_telemetry_dynamic449",
+          "id" : 14,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 442,
+            "line" : 449,
             "column" : 47,
             "source_fragment" : "="
           },
@@ -3085,14 +3256,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [22],
-          "actions" : ["telemetry_dynamic442"],
+          "action_ids" : [23],
+          "actions" : ["telemetry_dynamic449"],
           "base_default_next" : "MyEgress.remove_header_tbl",
           "next_tables" : {
-            "telemetry_dynamic442" : "MyEgress.remove_header_tbl"
+            "telemetry_dynamic449" : "MyEgress.remove_header_tbl"
           },
           "default_entry" : {
-            "action_id" : 22,
+            "action_id" : 23,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -3100,10 +3271,10 @@
         },
         {
           "name" : "MyEgress.remove_header_tbl",
-          "id" : 14,
+          "id" : 15,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 334,
+            "line" : 341,
             "column" : 10,
             "source_fragment" : "remove_header_tbl"
           },
@@ -3121,7 +3292,7 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [15, 13],
+          "action_ids" : [16, 14],
           "actions" : ["MyEgress.remove_header", "NoAction"],
           "base_default_next" : null,
           "next_tables" : {
@@ -3129,18 +3300,18 @@
             "NoAction" : null
           },
           "default_entry" : {
-            "action_id" : 13,
+            "action_id" : 14,
             "action_const" : false,
             "action_data" : [],
             "action_entry_const" : false
           }
         },
         {
-          "name" : "tbl_telemetry_dynamic456",
-          "id" : 15,
+          "name" : "tbl_telemetry_dynamic463",
+          "id" : 16,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 456,
+            "line" : 463,
             "column" : 12,
             "source_fragment" : "hdr.measurement.setInvalid(); ..."
           },
@@ -3151,14 +3322,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [23],
-          "actions" : ["telemetry_dynamic456"],
+          "action_ids" : [24],
+          "actions" : ["telemetry_dynamic463"],
           "base_default_next" : "MyEgress.telemetry_routing",
           "next_tables" : {
-            "telemetry_dynamic456" : "MyEgress.telemetry_routing"
+            "telemetry_dynamic463" : "MyEgress.telemetry_routing"
           },
           "default_entry" : {
-            "action_id" : 23,
+            "action_id" : 24,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -3166,10 +3337,10 @@
         },
         {
           "name" : "MyEgress.telemetry_routing",
-          "id" : 16,
+          "id" : 17,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 358,
+            "line" : 365,
             "column" : 10,
             "source_fragment" : "telemetry_routing"
           },
@@ -3180,26 +3351,26 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [16, 14],
+          "action_ids" : [17, 15],
           "actions" : ["MyEgress.route_telemetry", "NoAction"],
-          "base_default_next" : "tbl_telemetry_dynamic483",
+          "base_default_next" : "tbl_telemetry_dynamic490",
           "next_tables" : {
-            "MyEgress.route_telemetry" : "tbl_telemetry_dynamic483",
-            "NoAction" : "tbl_telemetry_dynamic483"
+            "MyEgress.route_telemetry" : "tbl_telemetry_dynamic490",
+            "NoAction" : "tbl_telemetry_dynamic490"
           },
           "default_entry" : {
-            "action_id" : 14,
+            "action_id" : 15,
             "action_const" : false,
             "action_data" : [],
             "action_entry_const" : false
           }
         },
         {
-          "name" : "tbl_telemetry_dynamic483",
-          "id" : 17,
+          "name" : "tbl_telemetry_dynamic490",
+          "id" : 18,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 483,
+            "line" : 490,
             "column" : 28,
             "source_fragment" : "= 12345; ..."
           },
@@ -3210,14 +3381,14 @@
           "with_counters" : false,
           "support_timeout" : false,
           "direct_meters" : null,
-          "action_ids" : [24],
-          "actions" : ["telemetry_dynamic483"],
+          "action_ids" : [25],
+          "actions" : ["telemetry_dynamic490"],
           "base_default_next" : null,
           "next_tables" : {
-            "telemetry_dynamic483" : null
+            "telemetry_dynamic490" : null
           },
           "default_entry" : {
-            "action_id" : 24,
+            "action_id" : 25,
             "action_const" : true,
             "action_data" : [],
             "action_entry_const" : true
@@ -3227,11 +3398,11 @@
       "action_profiles" : [],
       "conditionals" : [
         {
-          "name" : "node_18",
-          "id" : 6,
+          "name" : "node_20",
+          "id" : 7,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 372,
+            "line" : 379,
             "column" : 12,
             "source_fragment" : "standard_metadata.instance_type == 0"
           },
@@ -3249,15 +3420,15 @@
               }
             }
           },
-          "true_next" : "node_19",
-          "false_next" : "node_29"
+          "true_next" : "node_21",
+          "false_next" : "node_31"
         },
         {
-          "name" : "node_19",
-          "id" : 7,
+          "name" : "node_21",
+          "id" : 8,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 374,
+            "line" : 381,
             "column" : 16,
             "source_fragment" : "hdr.measurement.isValid()"
           },
@@ -3273,14 +3444,14 @@
             }
           },
           "false_next" : null,
-          "true_next" : "tbl_telemetry_dynamic381"
+          "true_next" : "tbl_telemetry_dynamic388"
         },
         {
-          "name" : "node_21",
-          "id" : 8,
+          "name" : "node_23",
+          "id" : 9,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 394,
+            "line" : 401,
             "column" : 20,
             "source_fragment" : "hdr.measurement.prev_egress_t > 0"
           },
@@ -3298,15 +3469,15 @@
               }
             }
           },
-          "true_next" : "tbl_telemetry_dynamic395",
-          "false_next" : "tbl_telemetry_dynamic397"
+          "true_next" : "tbl_telemetry_dynamic402",
+          "false_next" : "tbl_telemetry_dynamic404"
         },
         {
-          "name" : "node_25",
-          "id" : 9,
+          "name" : "node_27",
+          "id" : 10,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 418,
+            "line" : 425,
             "column" : 19,
             "source_fragment" : "rand_val <= SAMPLE_PERCENT"
           },
@@ -3324,15 +3495,15 @@
               }
             }
           },
-          "true_next" : "tbl_telemetry_dynamic421",
-          "false_next" : "tbl_telemetry_dynamic442"
+          "true_next" : "tbl_telemetry_dynamic428",
+          "false_next" : "tbl_telemetry_dynamic449"
         },
         {
-          "name" : "node_29",
-          "id" : 10,
+          "name" : "node_31",
+          "id" : 11,
           "source_info" : {
             "filename" : "telemetry_dynamic.p4",
-            "line" : 453,
+            "line" : 460,
             "column" : 17,
             "source_fragment" : "standard_metadata.instance_type == 2"
           },
@@ -3351,7 +3522,7 @@
             }
           },
           "false_next" : null,
-          "true_next" : "tbl_telemetry_dynamic456"
+          "true_next" : "tbl_telemetry_dynamic463"
         }
       ]
     }
@@ -3362,7 +3533,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "telemetry_dynamic.p4",
-        "line" : 504,
+        "line" : 511,
         "column" : 8,
         "source_fragment" : "update_checksum( ..."
       },

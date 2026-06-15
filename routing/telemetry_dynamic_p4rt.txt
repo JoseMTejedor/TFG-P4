@@ -247,6 +247,16 @@ type_info {
           }
         }
       }
+      members {
+        name: "event_time"
+        type_spec {
+          bitstring {
+            bit {
+              bitwidth: 32
+            }
+          }
+        }
+      }
     }
   }
 }

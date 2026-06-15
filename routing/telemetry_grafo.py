@@ -4,6 +4,10 @@ import ipaddress
 from dataclasses import dataclass
 import networkx as nx
 from p4utils.utils.sswitch_p4runtime_API import SimpleSwitchP4RuntimeAPI
+import os
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 # -----------------------------------------------------------------------------
 # Parámetros generales del controlador
@@ -40,6 +44,10 @@ PROBATION_WINDOW = 15
 # Tipos de digest definidos en P4.
 DIGEST_NEW_FLOW = 1
 DIGEST_FLOW_ALIVE = 2
+
+#Constantes para representar el grafo con la información de los costes de los enlaces
+GRAPH_OUTPUT_FILE = "grafo_dinamico.png"
+GRAPH_UPDATE_INTERVAL = 5.0
 
 # -----------------------------------------------------------------------------
 # Información de switches, hosts y enlaces
@@ -108,6 +116,17 @@ LINKS = {
     },
 }
 
+# Se establecen posiciones fijas de los switches en la representación gráfica.
+GRAPH_POSITIONS = {
+    1: (0, 2),  # sA
+    2: (2, 3),  # sB
+    3: (4, 3),  # sC
+    4: (6, 2),  # sD
+    5: (4, 1),  # sE
+    6: (2, 1),  # sF
+    7: (3, 2),  # sG
+}
+
 # Data class para guardar el estado de una ruta dinámica.
 @dataclass
 class RouteState:
@@ -147,7 +166,7 @@ def p4data_bitstring_to_int(p4data):
 
 # Extrae los campos de un digest flow_digest_t recibido desde P4Runtime.
 # En P4 el digest se define como un struct:
-#        digest_type, switch_id, src_ip, dst_ip
+# digest_type, switch_id, src_ip, dst_ip
 # Al llegar p4utils lo entregacomo una entrada de digest. Dentro de esa 
 # entrada hay una estructura interna y sus campos aparecen en la lista 
 # members, manteniendo el mismo orden definido en P4.
@@ -189,6 +208,9 @@ class DynamicTelemetryController:
         # La clave es una pareja de IPs ordenada.
         # El valor es un RouteState con el camino elegido y sus temporizadores.
         self.dynamic_routes = {}
+
+        # Marca temporal de la última vez que se generó la imagen del grafo dinámico.
+        self.last_graph_draw = 0.0
 
     # -------------------------------------------------------------------------
     # Inicialización
@@ -424,6 +446,19 @@ class DynamicTelemetryController:
             max_queue = max(max_queue, port_metrics.get('avg_queue_time', 0))
         return max_queue
     
+    # Actualiza los costes dinámicos de las aristas del grafo a partir de las 
+    # métricas recientes obtenidas de la base de datos
+    # Como el grafo es no dirigido, se calculan los costes en ambos snetidos del enlace 
+    # y se utiliza el mayor de ellos como valor 
+    def update_dynamic_graph_costs(self, metrics):
+        for u, v in self.graph.edges():
+            forward_cost = self.edge_cost(u, v, metrics)
+            reverse_cost = self.edge_cost(v, u, metrics)
+
+            self.graph[u][v]['forward_cost'] = forward_cost
+            self.graph[u][v]['reverse_cost'] = reverse_cost
+            self.graph[u][v]['dynamic_cost'] = max(forward_cost, reverse_cost)
+    
     # Selecciona la ruta que debe usarse entre dos hosts.
     # Primero calcula la ruta por defecto y su coste actual.
     # Después calcula la mejor ruta según las métricas recientes y su coste.
@@ -443,13 +478,7 @@ class DynamicTelemetryController:
         default_cost = self.path_cost(default_path, metrics)
         default_max_queue = self.max_queue_on_path(default_path, metrics)
 
-        # Actualizamos pesos dinámicos para calcular el mejor camino. actual.
-        for u, v in self.graph.edges():
-            forward_cost = self.edge_cost(u, v, metrics)
-            reverse_cost = self.edge_cost(v, u, metrics)
-            # El grafo es no dirigido. Por lo que usamos el peor de ambos
-            # sentidos como coste conservador del enlace.
-            self.graph[u][v]['dynamic_cost'] = max(forward_cost, reverse_cost)
+        self.update_dynamic_graph_costs(metrics)
 
         best_path = nx.shortest_path(self.graph, src_sw, dst_sw, weight='dynamic_cost')
         best_cost = self.path_cost(best_path, metrics)
@@ -476,6 +505,104 @@ class DynamicTelemetryController:
         print('Se mantiene la ruta por defecto/corta.', flush = True)
         return default_path
     
+
+
+
+    #Genera una imagen del grafo de la red con los costes dinámicos
+    #calculados a partir de las métricas de telemetría.
+    def draw_dynamic_graph(self, metrics):
+
+        # Etiquetas de los nodos: se muestra el nombre del switch en lugar de su ID numérico
+        labels = {
+            sw_id: info['name']
+            for sw_id, info in SWITCHES.items()
+        }
+
+        # Diccionario con las etiquetas que se mostrarán sobre cada enlace
+        edge_labels = {}
+
+        # Para cada enlace del grafo, se obtiene su coste dinámico y el número de muestras disponibles
+        for u, v, data in self.graph.edges(data=True):
+            dynamic_cost = data.get('dynamic_cost', BASE_LINK_DELAY)
+
+            # Puertos de salida asociados al enlace en ambos sentidos
+            port_uv = LINKS[u][v]['port']
+            port_vu = LINKS[v][u]['port']
+
+            # Número de muestras recientes disponibles para cada sentido del enlace
+            samples_uv = metrics.get((u, port_uv), {}).get('num_samples', 0)
+            samples_vu = metrics.get((v, port_vu), {}).get('num_samples', 0)
+
+            # Etiqueta mostrada sobre la arista: coste dinámico y muestras usadas
+            edge_labels[(u, v)] = (
+                f"{dynamic_cost:.0f} us\n"
+                f"muestras {samples_uv}/{samples_vu}"
+            )
+
+        # Creación de la figura
+        plt.figure(figsize=(9, 6))
+
+        # Dibujo de nodos
+        nx.draw_networkx_nodes(
+            self.graph,
+            GRAPH_POSITIONS,
+            node_size=1200
+        )
+
+        # Dibujo de etiquetas de nodos
+        nx.draw_networkx_labels(
+            self.graph,
+            GRAPH_POSITIONS,
+            labels=labels,
+            font_size=10
+        )
+
+        # Dibujo de enlaces
+        nx.draw_networkx_edges(
+            self.graph,
+            GRAPH_POSITIONS,
+            width=1.5
+        )
+
+        # Dibujo de etiquetas de enlaces
+        nx.draw_networkx_edge_labels(
+            self.graph,
+            GRAPH_POSITIONS,
+            edge_labels=edge_labels,
+            font_size=8
+        )
+
+        # Guardado de la imagen en fichero
+        plt.title("Grafo dinámico con métricas de telemetría")
+        plt.axis("off")
+        plt.tight_layout()
+        plt.savefig(GRAPH_OUTPUT_FILE, dpi=150)
+        plt.close()
+
+
+    # Actualiza la imagen del grafo dinámico de forma periódica.
+    # La actualización no se realiza en cada iteración del bucle principal,
+    # sino solo cuando ha pasado el intervalo definido por GRAPH_UPDATE_INTERVAL
+    def maybe_update_graph_drawing(self):
+
+        now = time.monotonic()
+
+        # Si todavía no ha pasado el intervalo mínimo, no se actualiza la imagen
+        if now - self.last_graph_draw < GRAPH_UPDATE_INTERVAL:
+            return
+
+        # Lectura de métricas recientes desde la base de datos
+        metrics = self.read_port_metrics()
+
+        # Actualización de los costes dinámicos del grafo
+        self.update_dynamic_graph_costs(metrics)
+
+        # Generación de la imagen del grafo
+        self.draw_dynamic_graph(metrics)
+
+        # Actualización de la marca temporal
+        self.last_graph_draw = now
+
     # -------------------------------------------------------------------------
     # Instalación, modificación y borrado de rutas dinámicas
     # -------------------------------------------------------------------------
@@ -599,12 +726,12 @@ class DynamicTelemetryController:
     
         # Comprobamos que ambos hosts son conocidos en la topología.
         if src_ip not in HOSTS or dst_ip not in HOSTS:
-            print(f'Digest NEW_FLOW ignorado: host desconocido {src_ip} -> {dst_ip}', flush = True)
+            print(f'Digest NEW_FLOW ignorado: host desconocido {src_ip} -> {dst_ip}')
             return
 
         key = pair_key(src_ip, dst_ip)
         if key in self.dynamic_routes:
-            print(f'Digest NEW_FLOW ignorado: ya existe ruta para {src_ip} <-> {dst_ip}', flush = True)
+            print(f'Digest NEW_FLOW ignorado: ya existe ruta para {src_ip} <-> {dst_ip}')
             return
 
         print(f"Nuevo par detectado en {SWITCHES[switch_id]['name']}: {src_ip} -> {dst_ip}", flush = True)
@@ -622,14 +749,14 @@ class DynamicTelemetryController:
         state = self.dynamic_routes.get(key)
 
         if state is None:
-            print(f'Digest FLOW_ALIVE ignorado: no hay estado para {src_ip} <-> {dst_ip}', flush = True)
+            print(f'Digest FLOW_ALIVE ignorado: no hay estado para {src_ip} <-> {dst_ip}')
             return
 
         if state.status != 'PROBATION':
-            print(f'Digest FLOW_ALIVE recibido para ruta ya activa {src_ip} <-> {dst_ip}', flush = True)
+            print(f'Digest FLOW_ALIVE recibido para ruta ya activa {src_ip} <-> {dst_ip}')
             return
 
-        print(f"FLOW_ALIVE recibido en {SWITCHES[switch_id]['name']}: {src_ip} -> {dst_ip}", flush = True)
+        print(f"FLOW_ALIVE recibido en {SWITCHES[switch_id]['name']}: {src_ip} -> {dst_ip}")
         self.renew_route(state)
 
     # Consulta todos los switches para leer los digest recibidos.
@@ -696,6 +823,7 @@ class DynamicTelemetryController:
             while True:
                 self.poll_digests()
                 self.check_route_timers()
+                self.maybe_update_graph_drawing()
                 time.sleep(0.05)
         except KeyboardInterrupt:
             print('\nApagando controlador dinámico...')

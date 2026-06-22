@@ -41,6 +41,8 @@ del grafo de la red y la que si representa el grafo de la red. Salvo esta difere
 ambos codigos hacen lo mismo. Pero se ha querido dejar el codigo sin dibujar el grafo por claridad
 y facilitar la comprensión del funcionamiento el controlador. 
 
+Ejecutar estos comandos en un terminar aparte
+
 Controlador sin dibujo grafo:
 
 - sudo python telemetry_dynamic.py 
@@ -49,6 +51,20 @@ Controlador con dibujo grafo:
 
 - sudo python telemetry_grafo.py 
 
+En la segunda opción, el grafo se genera como una imagen llamada grafo_dinamico.png dentro del 
+directorio de ejecución. Esta imagen debería actualizarse automáticamente cada cierto intervalo 
+de tiempo, o cada vez que se detecte una nueva comunicación. No obstante, si el ordenador donde 
+se lanza la ejecución no tiene suficiente capacidad o se sobrecalienta, puede ser necesario cerrar 
+y volver a abrir la imagen para visualizar la versión actualizada.
+
+AÑADIR EL DISSECTOR AL WIRESHARK:
+
+Para añadir el dissector a Wireshark, abrir Wireshark y acceder a la pestaña Help. Dentro de esta,
+entrar en About Wireshark y después en Folders. En esa ventana, buscar la ruta correspondiente a 
+Personal Lua Plugins.
+
+Una vez localizada esa carpeta, copiar en ella el fichero - tmt_dissector.lua. Después, cerrar y volver 
+a abrir Wireshark. Tras reiniciarlo, Wireshark debería detectar e interpretar la cabecera TMT.
 
 NOTAS:
 

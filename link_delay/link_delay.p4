@@ -4,7 +4,7 @@
 
 const bit<16> TYPE_IPV4 = 0x800;
 // Se esta usando otro ethernet tipo experimental reservado, para poder tener dissectors con las dos versiones
-const bit<16> TYPE_CUSTOM = 0x88B6;
+const bit<16> TYPE_CUSTOM = 0x88B5;
 
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
